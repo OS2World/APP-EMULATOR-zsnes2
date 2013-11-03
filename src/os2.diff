@@ -1,0 +1,435 @@
+diff -EbwuNr configure.in.org configure.in
+--- configure.in.org	2008-07-28 23:54:26.000000000 +0900
++++ configure.in	2008-08-07 07:02:20.000000000 +0900
+@@ -85,6 +85,12 @@
+   *-*-cygwin* | *-*-*ming*)
+     NFLAGS="$NFLAGS -f win32"
+     ;;
++  *-*-os2*)
++    CFLAGS="$CFLAGS -D__OS2__"
++    NFLAGS="$NFLAGS -D__OS2__ -f aout"
++    EXESUF=".exe"
++    LINUX_LIB="\$(PORT_D)/lib.o"
++    ;;
+   *)
+     AC_MSG_ERROR(This target is not supported)
+     ;;
+@@ -235,12 +241,26 @@
+ AC_MSG_RESULT($debug)
+ if test x$debug = xyes; then
+ dnl - It is easier to debug zsnes with no optimization enabled.
++  case x$target in
++    *-*-os2*)
++      ZSNESEXE="zsnes2d"
++      ;;
++    *)
+   ZSNESEXE="zsnesd"
++      ;;
++  esac
+   PSR_TEMP=""
+   CFLAGS="$CFLAGS -Wall -W -DDEBUG -O0 -fno-omit-frame-pointer -gstabs3"
+   NFLAGS="$NFLAGS -DDEBUG -g -F stabs -s -O0"
+ else
++  case x$target in
++    *-*-os2*)
++      ZSNESEXE="zsnes2"
++      ;;
++    *)
+   ZSNESEXE="zsnes"
++      ;;
++  esac
+   PSR_TEMP="	rm -f t_\$*.c"
+ 
+   CFLAGSBAK="$CFLAGS"
+@@ -330,6 +350,8 @@
+ AC_SUBST(MMLIB_FILES)
+ AC_SUBST(DEBUGGER_FILES)
+ AC_SUBST(PSR_TEMP)
++AC_SUBST(EXESUF)
++AC_SUBST(LINUX_LIB)
+ 
+ AC_CONFIG_FILES(Makefile)
+ touch -t 198001010000 makefile.dep
+diff -EbwuNr Makefile.in.org Makefile.in
+--- Makefile.in.org	2007-01-24 13:54:24.000000000 +0900
++++ Makefile.in	2008-08-07 06:17:46.000000000 +0900
+@@ -30,7 +30,9 @@
+ VID_D=video
+ ZIP_D=zip
+ 
+-PSR=parsegen
++EXESUF=@EXESUF@
++
++PSR=parsegen$(EXESUF)
+ PSR_H=cfg.h md.h input.h
+ 
+ CHIP_O=$(CHIP_D)/c4emu.o $(CHIP_D)/c4proc.o $(CHIP_D)/dsp1emu.o\
+@@ -64,7 +66,7 @@
+ 
+ PORT_O=$(PORT_D)/audio.o $(PORT_D)/battery.o\
+ 	$(PORT_D)/sdlintrf.o $(PORT_D)/sdllink.o @GL_DRAW@ $(PORT_D)/sw_draw.o\
+-	$(PORT_D)/safelib.o
++	$(PORT_D)/safelib.o @LINUX_LIB@
+ 
+ TOOL_O=$(TOOL_D)/fileutil.o $(TOOL_D)/strutil.o
+ 
+@@ -84,9 +86,9 @@
+ 	$(MMLIB_O) $(NET_O) $(VID_O) $(PORT_O) $(ZIP_O)
+ 
+ .PHONY: default main tools all install clean tclean distclean
+-.SUFFIXES: .asm .c .cpp .psr
++.SUFFIXES: .asm .c .cpp .psr $(EXESUF)
+ 
+-%: %.cpp
++%$(EXESUF): %.cpp
+ 	@CXX@ @CXXFLAGS@ -o $@ $<
+ %.o: %.asm
+ 	@NASMPATH@ @NFLAGS@ -o $@ $<
+@@ -100,40 +102,40 @@
+ default: main
+ all: main tools
+ main: makefile.dep $(Z_OBJS)
+-	@ZC@ -o @ZSNESEXE@ $(Z_OBJS) @ZCFLAGS@ @LDFLAGS@
++	@ZC@ -o @ZSNESEXE@$(EXESUF) $(Z_OBJS) @ZCFLAGS@ @LDFLAGS@
+ 	rm -f version.o
+ 
+ $(PSR): parsegen.cpp
+ 	@CXX@ @CXXFLAGS@ -o $@ $< -lz
+ 
+-TOOLSEXE=$(TOOL_D)/archopt $(TOOL_D)/cutrtype $(TOOL_D)/extraext\
+-	$(TOOL_D)/macroll $(TOOL_D)/minwhite $(TOOL_D)/nreplace\
+-	$(TOOL_D)/sec-test $(TOOL_D)/srccount $(TOOL_D)/varrep
+-tools: $(TOOLSEXE) $(TOOL_D)/depbuild
+-$(TOOL_D)/archopt: $(TOOL_D)/archopt.c
+-	@CC@ @CFLAGS@ -m32 -o $@ $@.c
+-$(TOOL_D)/cutrtype: $(TOOL_D)/cutrtype.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_O)
+-$(TOOL_D)/depbuild: $(TOOL_D)/depbuild.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_O)
+-$(TOOL_D)/extraext: $(TOOL_D)/extraext.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_O)
+-$(TOOL_D)/macroll: $(TOOL_D)/macroll.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_O)
+-$(TOOL_D)/minwhite: $(TOOL_D)/minwhite.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_D)/fileutil.o
+-$(TOOL_D)/nreplace: $(TOOL_D)/nreplace.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_D)/fileutil.o
+-$(TOOL_D)/sec-test: $(TOOL_D)/sec-test.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_O)
+-$(TOOL_D)/srccount: $(TOOL_D)/srccount.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_D)/fileutil.o
+-$(TOOL_D)/varrep: $(TOOL_D)/varrep.cpp $(TOOL_O)
+-	@CXX@ @CXXFLAGS@ -o $@ $@.cpp $(TOOL_O)
++TOOLSEXE=$(TOOL_D)/archopt$(EXESUF) $(TOOL_D)/cutrtype$(EXESUF) $(TOOL_D)/extraext$(EXESUF)\
++	$(TOOL_D)/macroll$(EXESUF) $(TOOL_D)/minwhite$(EXESUF) $(TOOL_D)/nreplace$(EXESUF)\
++	$(TOOL_D)/sec-test$(EXESUF) $(TOOL_D)/srccount$(EXESUF) $(TOOL_D)/varrep$(EXESUF)
++tools: $(TOOLSEXE) $(TOOL_D)/depbuild$(EXESUF)
++$(TOOL_D)/archopt$(EXESUF): $(TOOL_D)/archopt.c
++	@CC@ @CFLAGS@ -m32 -o $@ $<
++$(TOOL_D)/cutrtype$(EXESUF): $(TOOL_D)/cutrtype.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_O)
++$(TOOL_D)/depbuild$(EXESUF): $(TOOL_D)/depbuild.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_O)
++$(TOOL_D)/extraext$(EXESUF): $(TOOL_D)/extraext.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_O)
++$(TOOL_D)/macroll$(EXESUF): $(TOOL_D)/macroll.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_O)
++$(TOOL_D)/minwhite$(EXESUF): $(TOOL_D)/minwhite.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_D)/fileutil.o
++$(TOOL_D)/nreplace$(EXESUF): $(TOOL_D)/nreplace.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_D)/fileutil.o
++$(TOOL_D)/sec-test$(EXESUF): $(TOOL_D)/sec-test.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_O)
++$(TOOL_D)/srccount$(EXESUF): $(TOOL_D)/srccount.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_D)/fileutil.o
++$(TOOL_D)/varrep$(EXESUF): $(TOOL_D)/varrep.cpp $(TOOL_O)
++	@CXX@ @CXXFLAGS@ -o $@ $< $(TOOL_O)
+ 
+ include makefile.dep
+-makefile.dep: $(TOOL_D)/depbuild Makefile
+-	$(TOOL_D)/depbuild @CC@ "@CFLAGS@" @NASMPATH@ "@NFLAGS@" $(Z_OBJS) > makefile.dep
++makefile.dep: $(TOOL_D)/depbuild$(EXESUF) Makefile
++	$(TOOL_D)/depbuild$(EXESUF) @CC@ "@CFLAGS@" @NASMPATH@ "@NFLAGS@" $(Z_OBJS) > makefile.dep
+ 
+ Makefile: Makefile.in config.status
+ 	./config.status
+@@ -142,17 +144,17 @@
+ 	./autogen.sh --recheck
+ 
+ install:
+-	@INSTALL@ -d -m 0755 $(DESTDIR)/@prefix@/bin
+-	@INSTALL@ -m 0755 @ZSNESEXE@ $(DESTDIR)/@prefix@/bin
+-	@INSTALL@ -d -m 0755 $(DESTDIR)/@prefix@/man/man1
+-	@INSTALL@ -m 0644 linux/zsnes.1 $(DESTDIR)/@prefix@/man/man1
++	@INSTALL@ -d -m 0755 @prefix@/bin
++	@INSTALL@ -m 0755 @ZSNESEXE@$(EXESUF) @prefix@/bin
++	@INSTALL@ -d -m 0755 @prefix@/man/man1
++	@INSTALL@ -m 0644 linux/zsnes.1 @prefix@/man/man1
+ uninstall:
+-	rm -f @prefix@/bin/$(notdir @ZSNESEXE@) @prefix@/man/man1/zsnes.1
++	rm -f @prefix@/bin/$(notdir @ZSNESEXE@$(EXESUF)) @prefix@/man/man1/zsnes.1
+ 
+ clean:
+-	rm -f $(Z_OBJS) $(PSR) $(PSR_H) @ZSNESEXE@
++	rm -f $(Z_OBJS) $(PSR) $(PSR_H) @ZSNESEXE@$(EXESUF)
+ tclean:
+ 	rm -f $(TOOL_O) $(TOOLSEXE)
+ distclean: clean tclean
+ 	rm -f Makefile makefile.dep aclocal.m4 configure config.log \
+-	config.status config.h $(TOOL_D)/depbuild
++	config.status config.h $(TOOL_D)/depbuild$(EXESUF)
+diff -EbwuNr zmovie.c.org zmovie.c
+--- zmovie.c.org	2007-01-20 13:30:54.000000000 +0900
++++ zmovie.c	2008-08-07 05:48:08.000000000 +0900
+@@ -22,8 +22,13 @@
+ #ifdef __UNIXSDL__
+ #include "gblhdr.h"
+ #include <signal.h>
++#ifdef __OS2__
++#define DIR_SLASH "\\"
++#define WRITE_BINARY "wb"
++#else
+ #define DIR_SLASH "/"
+ #define WRITE_BINARY "w"
++#endif
+ #define NULL_FILE "/dev/null"
+ #include "linux/safelib.h"
+ #else
+diff -EbwuNr zpath.c.org zpath.c
+--- zpath.c.org	2007-01-15 13:47:42.000000000 +0900
++++ zpath.c	2008-08-07 05:41:26.000000000 +0900
+@@ -51,6 +51,8 @@
+ char ZCfgFile[] = "zsnes.cfg";
+ #elif defined(__WIN32__)
+ char ZCfgFile[] = "zsnesw.cfg";
++#elif defined(__OS2__)
++char ZCfgFile[] = "zsnes2.cfg";
+ #else
+ char ZCfgFile[] = "zsnesl.cfg";
+ #endif
+@@ -62,7 +64,7 @@
+ static bool ZStartAlloc = false, ZCfgAlloc = false, ZSramAlloc = false, ZRomAlloc = false;
+ static bool ZCartAlloc = false, ZSaveAlloc = false, ZStateAlloc = false, ZSaveST2Alloc = false;
+ 
+-#ifdef __UNIXSDL__
++#if defined(__UNIXSDL__) && !defined(__OS2__)
+ 
+ void cfgpath_ensure(const char *launch_command)
+ {
+@@ -242,7 +244,7 @@
+   }
+   else
+   {
+-    #ifdef __UNIXSDL__
++    #if defined(__UNIXSDL__) && !defined(__OS2__)
+     ZSramPath = ZCfgPath;
+     #else
+     ZSramPath = ZRomPath;
+@@ -435,7 +437,7 @@
+ 
+ char *realpath_dir(const char *path, const char *file, char *buf)
+ {
+-#ifdef __UNIXSDL__
++#if defined(__UNIXSDL__) && !defined(__OS2__)
+   return(realpath_tilde(strdupcat_internal(path, file), buf));
+ #else
+   return(realpath(strdupcat_internal(path, file), buf));
+@@ -623,7 +625,7 @@
+   return(success);
+ }
+ 
+-#ifdef __UNIXSDL__
++#if defined(__UNIXSDL__) && !defined(__OS2__)
+ 
+ //Like realpath(), but will return the last element as the link it is
+ char *realpath_link(const char *path, char *resolved_path)
+diff -EbwuNr zpath.h.org zpath.h
+--- zpath.h.org	2007-01-16 10:15:20.000000000 +0900
++++ zpath.h	2008-08-07 05:41:00.000000000 +0900
+@@ -47,7 +47,7 @@
+ #define false 0
+ #endif
+ 
+-#ifdef __UNIXSDL__
++#if defined(__UNIXSDL__) && !defined(__OS2__)
+ #define DIR_SLASH "/"
+ #define DIR_SLASH_C '/'
+ #define DIR_SLASH_C_OTHER '\\'
+@@ -111,7 +111,7 @@
+ void strbasename(char *str);
+ bool mkpath(const char *path, mode_t mode);
+ 
+-#ifdef __UNIXSDL__
++#if defined(__UNIXSDL__) && !defined(__OS2__)
+ char *realpath_link(const char *path, char *resolved_path);
+ char *realpath_tilde(const char *path, char *resolved_path);
+ #else
+diff -EbwuNr gui/guifuncs.c.org gui/guifuncs.c
+--- gui/guifuncs.c.org	2007-01-24 11:40:38.000000000 +0900
++++ gui/guifuncs.c	2008-08-07 07:06:32.000000000 +0900
+@@ -25,6 +25,9 @@
+ #include "gblhdr.h"
+ #define fnamecmp strcmp
+ #define fnamencmp strncmp
++#ifdef __OS2__
++#include "../linux/lib.h"
++#endif
+ #else
+ #ifdef __WIN32__
+ #include "../win/lib.h"
+@@ -1197,7 +1200,7 @@
+ 
+   if (lists&LIST_DN)
+   {
+-#ifndef __UNIXSDL__
++#if !defined(__UNIXSDL__) || defined(__OS2__)
+     unsigned int drives = GetLogicalDrives(), i = 0;
+ #endif
+ 
+@@ -1207,7 +1210,7 @@
+       sort((intptr_t *)d_names, offset, (size_t)(*d_names), swapdirs);
+     }
+ 
+-#ifndef __UNIXSDL__
++#if !defined(__UNIXSDL__) || defined(__OS2__)
+     while (i < 26)
+     {
+       if (drives&BIT(i))
+@@ -1376,7 +1379,7 @@
+     nameptr = d_names[GUIcurrentdircursloc+2];
+ 
+     strcatslash(ZRomPath);
+-    #ifndef __UNIXSDL__
++    #if !defined(__UNIXSDL__) || defined(__OS2__)
+     if ((strlen(nameptr) == 4) && (nameptr[2] == ':')) // MS drives are stored as '[?:]',
+     { // so we can't use quick string catenation to browse through
+       strncpy(ZRomPath, nameptr+1, 2);
+@@ -1654,7 +1657,7 @@
+   return(0);
+ }
+ 
+-#ifdef __UNIXSDL__
++#if defined(__UNIXSDL__) && !defined(__OS2__)
+ #define DriveCount() 0
+ #else
+ static unsigned int DriveCount()
+diff -EbwuNr linux/lib.c.org linux/lib.c
+--- linux/lib.c.org	2008-08-07 06:15:52.000000000 +0900
++++ linux/lib.c	2008-08-07 06:15:46.000000000 +0900
+@@ -0,0 +1,39 @@
++/*
++Copyright (C) 1997-2007 ZSNES Team ( zsKnight, _Demo_, pagefault, Nach )
++
++http://www.zsnes.com
++http://sourceforge.net/projects/zsnes
++https://zsnes.bountysource.com
++
++This program is free software; you can redistribute it and/or
++modify it under the terms of the GNU General Public License
++version 2 as published by the Free Software Foundation.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with this program; if not, write to the Free Software
++Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++*/
++
++#include "gblhdr.h"
++
++#ifdef __OS2__
++
++#define INCL_DOS
++#include <os2.h>
++
++//Return bitmask of available drives, A = BIT(0), B = BIT(1), etc...
++unsigned int GetLogicalDrives( void )
++{
++  ULONG ulDrvNum;
++  ULONG ulDrvMap;
++
++  DosQueryCurrentDisk( &ulDrvNum, &ulDrvMap );
++
++  return ulDrvMap;
++}
++#endif
+diff -EbwuNr linux/lib.h.org linux/lib.h
+--- linux/lib.h.org	2008-08-07 06:15:56.000000000 +0900
++++ linux/lib.h	2008-08-07 06:15:46.000000000 +0900
+@@ -0,0 +1,27 @@
++/*
++Copyright (C) 1997-2007 ZSNES Team ( zsKnight, _Demo_, pagefault, Nach )
++
++http://www.zsnes.com
++http://sourceforge.net/projects/zsnes
++https://zsnes.bountysource.com
++
++This program is free software; you can redistribute it and/or
++modify it under the terms of the GNU General Public License
++version 2 as published by the Free Software Foundation.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with this program; if not, write to the Free Software
++Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++*/
++
++#ifndef LIB_H
++#define LIB_H
++
++unsigned int GetLogicalDrives( void );
++
++#endif
+diff -EbwuNr linux/sdllink.c.org linux/sdllink.c
+--- linux/sdllink.c.org	2007-01-18 09:56:08.000000000 +0900
++++ linux/sdllink.c	2008-08-07 07:31:04.000000000 +0900
+@@ -663,10 +663,12 @@
+       case SDLK_LEFTBRACKET:  vkeyval = '['; accept = 1; break;
+       case SDLK_RIGHTBRACKET: vkeyval = ']'; accept = 1; break;
+       case SDLK_SEMICOLON:    vkeyval = ';'; accept = 1; break;
++      case SDLK_QUOTE:        vkeyval = '\''; accept = 1; break;
+       case SDLK_COMMA:        vkeyval = ','; accept = 1; break;
+       case SDLK_PERIOD:       vkeyval = '.'; accept = 1; break;
+       case SDLK_SLASH:        vkeyval = '/'; accept = 1; break;
+-      case SDLK_QUOTE:        vkeyval = '`'; accept = 1; break;
++      case SDLK_BACKQUOTE:    vkeyval = '`'; accept = 1; break;
++      case SDLK_BACKSLASH:    vkeyval = '\\'; accept = 1; break;
+     }
+   }
+   else
+diff -EbwuNr tools/depbuild.cpp.org tools/depbuild.cpp
+--- tools/depbuild.cpp.org	2006-12-27 04:04:10.000000000 +0900
++++ tools/depbuild.cpp	2008-07-29 13:46:58.000000000 +0900
+@@ -70,7 +70,11 @@
+ //This function is so crazy because GCC doesn't put in proper directories, and adds system headers
+ void dependency_calculate_c(const char *filename)
+ {
++#ifdef __OS2__
++  string command = cc + " " + cflags + " -MM -MG " + filename;
++#else
+   string command = cc + " " + cflags + " -M -MG " + filename;
++#endif
+   FILE *fp = popen(command.c_str(), "r");
+   if (fp)
+   {
+diff -EbwuNr tools/fileutil.h.org tools/fileutil.h
+--- tools/fileutil.h.org	2006-12-27 04:04:10.000000000 +0900
++++ tools/fileutil.h	2008-07-29 13:47:10.000000000 +0900
+@@ -25,6 +25,10 @@
+ #include <string.h>
+ #include <sys/stat.h>
+ 
++#ifdef __OS2__
++#include <unistd.h>
++#endif
++
+ void parse_dir(const char *, void (*func)(const char *, struct stat&));
+ bool parse_path(const char *, void (*func)(const char *, struct stat&));
+ 

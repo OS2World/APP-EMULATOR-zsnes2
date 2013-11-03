@@ -1,0 +1,73 @@
+                            ZSNES v1.51r2 for OS/2
+                           ------------------------
+                          
+1. Introduction
+---------------
+
+  This program is a OS/2 port of ZSNES.
+  
+2. Requirements...
+------------------
+
+  .kLIBC v0.6.3
+  .SDL/2 v1.2.10
+  
+3. Limits or Known Bugs...
+--------------------------
+
+  .Changing drive is not supported on file selection
+  .ZSNES debugger is not supported
+  .OpenGL is not supported
+ 
+4. History specific to OS/2
+---------------------------
+
+  - 1.51r2 (2008/08/13 )
+    .Support drive letter
+    .Use filename style of Windows and DOS
+    .'`' and '\' cannot be entered at filename inputline. Fixed.
+       
+  - 1.51 ( 2008/07/30 )
+    .Initial release
+
+5. How to compile
+-----------------
+
+5.1 Requirements...
+-------------------
+
+  .GNU utilities( sh, cp, rm, mkdir, ... )
+  .GNU Make v3.81r2
+  .SDL v1.2.10
+  .GCC v3.3.5 CSD 3
+  .NASM v0.98.38
+  .zlib v1.2.3
+  .libpng v1.2.25 
+  
+5.2 Compilation
+---------------
+
+  Execute the following on the command line.
+  
+    configure.cmd
+    
+    make SHELL=/bin/sh
+    
+  There should be 'sh.exe' in '/bin' directory.
+  
+  Now you can get 'zsnes2.exe'.
+   
+6. Official ZSNES homepage
+--------------------------
+
+    http://www.zsnes.com
+    
+7. Contacts...
+--------------
+
+  e-mail : komh@chollian.net
+  ICQ    : 124861818
+  MSN    : komh@chollian.net
+  IRC    : lvzuufx, #os2 at HANIRC(irc.hanirc.org)
+
+                                                  2008/07/30, KO Myung-Hun
